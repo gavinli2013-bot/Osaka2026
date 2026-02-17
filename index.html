@@ -111,10 +111,24 @@
             <div class="absolute top-0 left-0 right-0 h-64 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-b-[3rem] shadow-lg z-0"></div>
             <div class="absolute top-10 right-10 w-32 h-32 bg-yellow-300 rounded-full mix-blend-overlay filter blur-xl opacity-50 animate-pulse-slow"></div>
             
-            <header class="mb-6 mt-12 px-6 relative z-10 text-white">
-                <h1 class="text-4xl font-bold tracking-tight mb-2 font-pop">My Journeys</h1>
-                <p class="text-white/80 text-sm font-medium">Ready for your next adventure?</p>
+            <header class="mb-6 mt-12 px-6 relative z-10 text-white flex justify-between items-end">
+                <div>
+                    <h1 class="text-4xl font-bold tracking-tight mb-2 font-pop">My Journeys</h1>
+                    <p class="text-white/80 text-sm font-medium">Ready for your next adventure?</p>
+                </div>
+                <!-- 新增：備份與還原按鈕 -->
+                <div class="flex gap-2 mb-1">
+                    <button @click="exportData" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors shadow-sm" title="下載/備份行程">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                    <button @click="triggerImport" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors shadow-sm" title="載入備份">
+                        <i class="fa-solid fa-file-import"></i>
+                    </button>
+                </div>
             </header>
+            
+            <!-- 新增：隱藏的檔案輸入框，用於載入備份 -->
+            <input type="file" ref="fileInput" class="hidden" accept=".json" @change="handleImport">
 
             <div class="px-6 pb-24 relative z-10 grid gap-5">
                 <button @click="startNewTrip" class="w-full h-28 rounded-3xl bg-white shadow-lg shadow-purple-200 border-2 border-transparent hover:border-purple-300 flex flex-row items-center justify-center gap-4 text-gray-500 hover:text-purple-600 transition-all group overflow-hidden relative">
@@ -534,6 +548,9 @@
                 const form = reactive({ id: null, time: '09:00', title: '', location: '', lat: null, lon: null });
                 const expenseForm = reactive({ amount: '', currency: 'JPY', item: '', category: 'food' });
                 const todoForm = reactive({ text: '' }); // Added for Todo
+                
+                // Added for Import/Export
+                const fileInput = ref(null);
 
                 let timeInterval = null, map = null, markersLayer = null, chart = null;
 
@@ -714,13 +731,58 @@
                 const getCategoryIcon = (c) => ({food:'fa-solid fa-utensils',transport:'fa-solid fa-train-subway',shopping:'fa-solid fa-bag-shopping',other:'fa-solid fa-star'}[c]||'fa-solid fa-circle');
                 const formatDate = (iso) => { const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; };
 
+                // --- Import/Export Functions ---
+                const exportData = () => {
+                    const dataStr = JSON.stringify(trips.value, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `travel_plan_backup_${new Date().toISOString().slice(0,10)}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+
+                const triggerImport = () => {
+                    fileInput.value.click();
+                };
+
+                const handleImport = (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const importedTrips = JSON.parse(e.target.result);
+                            if (Array.isArray(importedTrips)) {
+                                if(confirm('確定要載入備份嗎？這將會覆蓋現有的所有行程資料。')) {
+                                     trips.value = importedTrips;
+                                     localStorage.setItem('allTrips', JSON.stringify(trips.value));
+                                     alert('備份載入成功！');
+                                     if(trips.value.length === 0) startNewTrip(); // If imported empty list
+                                }
+                            } else {
+                                alert('檔案格式錯誤');
+                            }
+                        } catch (err) {
+                            alert('無法讀取檔案');
+                        }
+                        event.target.value = ''; // Reset input
+                    };
+                    reader.readAsText(file);
+                };
+
                 return {
                     currentView, trips, currentTripId, startNewTrip, openTrip, deleteTrip, goHome,
                     setupForm, config, detectedInfo, detectSettings, finishSetup, localTimeStr, availableCurrencies, getRate, convertToHKD,
                     currentTab, days, selectedDayIndex, currentDayItinerary, sortedExpenses, totalExpensesHKD, showItineraryModal, showExpenseModal, showTodoModal, isEditing, isSaving, form, expenseForm, todoForm, flightInfo, saveFlightInfo,
                     todos, completedTodoCount, todoProgress, saveTodo, toggleTodo, deleteTodo, // Export Todo stuff
                     openModal, closeModal, editItem, deleteItem, saveItinerary, saveExpense, deleteExpense, getGoogleMapsLink, getCategoryIcon, formatDate, switchTab, changeDay, getTranslateLink,
-                    currentTheme, themes, getThemeColor, currentWizardColor
+                    currentTheme, themes, getThemeColor, currentWizardColor,
+                    // Export Import/Export functions
+                    exportData, triggerImport, handleImport, fileInput
                 };
             }
         }).mount('#app');
