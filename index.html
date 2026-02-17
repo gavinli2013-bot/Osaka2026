@@ -615,13 +615,27 @@
                 const startTimeLoop = () => { updateTime(); timeInterval = setInterval(updateTime, 1000); };
                 
                 const currentDayItinerary = computed(() => (itineraries.value[selectedDayIndex.value] || []).sort((a,b)=>a.time.localeCompare(b.time)));
-                // Flatten all itineraries for the Map view
+                
+                // Flatten all itineraries and attach date info for Map view
                 const allItineraries = computed(() => {
-                    let all = [];
-                    Object.values(itineraries.value).forEach(dayItems => {
-                        all = all.concat(dayItems);
+                    const list = [];
+                    const dayKeys = Object.keys(itineraries.value);
+                    dayKeys.forEach(key => {
+                        const dayItems = itineraries.value[key];
+                        if (!dayItems || !dayItems.length) return;
+                        
+                        const dayIdx = parseInt(key);
+                        const dayInfo = days.value[dayIdx];
+                        const dateStr = dayInfo ? `${dayInfo.date} (${dayInfo.weekday})` : `Day ${dayIdx+1}`;
+                        
+                        dayItems.forEach(item => {
+                            list.push({
+                                ...item,
+                                dateStr: dateStr
+                            });
+                        });
                     });
-                    return all;
+                    return list;
                 });
 
                 const sortedExpenses = computed(() => [...expenses.value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
@@ -653,7 +667,9 @@
                     allItineraries.value.forEach(i => { 
                         if(i.lat&&i.lon) { 
                             const myIcon = L.divIcon({ className: 'custom-icon', html: `<div style="background-color:var(--color-main);width:1.2rem;height:1.2rem;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] }); 
-                            L.marker([i.lat,i.lon], {icon: myIcon}).bindPopup(`<b>${i.time}</b><br>${i.title}`).addTo(markersLayer); 
+                            L.marker([i.lat,i.lon], {icon: myIcon})
+                             .bindPopup(`<div class="text-center"><span class="text-xs font-bold text-gray-500">${i.dateStr} ${i.time}</span><br><span class="text-sm font-bold text-gray-800">${i.title}</span></div>`)
+                             .addTo(markersLayer); 
                             bounds.push([i.lat,i.lon]); 
                         } 
                     });
@@ -711,4 +727,3 @@
     </script>
 </body>
 </html>
-
